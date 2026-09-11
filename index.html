@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Voice to EHR: Clinical Documentation by Voice</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&display=swap');
+
+:root{
+  --ink:#4A2B39; --ink-2:#5E3646; --ink-3:#FFFFFF;
+  --paper:#FFFFFF; --surface:#FDF3F7; --line:#F0DCE5; --line-dark:#A9CEB8;
+  --text-soft:#8A6675; --on-dark:#23402F; --on-dark-soft:#5E7D6B;
+  --pulse:#D6547F; --pulse-tint:#FCE4EE; --pulse-soft-on-dark:#8E2F53;
+  --verified:#3F8F63; --verified-tint:#DCF0E4;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{background:var(--surface); color:var(--ink); font-family:'Inter', sans-serif; min-height:100vh;}
+.wrap{max-width:1180px; margin:0 auto; padding:0 24px;}
+
+.topbar{display:flex; align-items:center; justify-content:space-between; padding:22px 0 18px; flex-wrap:wrap; gap:14px;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand svg{width:30px; height:30px; flex-shrink:0;}
+.brand-name{font-family:'Space Grotesk', sans-serif; font-weight:700; font-size:19px; color:var(--ink);}
+.topbar-right{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+.demo-tag{font-size:12.5px; color:var(--text-soft);}
+select#langSelect{font-family:'Inter', sans-serif; font-size:13px; border:1px solid var(--line); border-radius:7px; padding:7px 11px; background:var(--paper); color:var(--ink); cursor:pointer;}
+
+.hero{padding:28px 0 6px; max-width:760px;}
+.hero h1{font-family:'Bricolage Grotesque', sans-serif; font-size:46px; font-weight:700; line-height:1.1; color:var(--ink); letter-spacing:-1px;}
+.hero p{margin-top:16px; font-size:17px; line-height:1.6; color:var(--text-soft); max-width:580px;}
+
+.ekg-wrap{margin:34px 0 8px; height:52px; width:100%; overflow:hidden;}
+.ekg-wrap path{fill:none; stroke:var(--pulse); stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round; stroke-dasharray:1400; stroke-dashoffset:1400; animation:draw 1.6s ease-out 0.2s forwards;}
+@keyframes draw{ to{ stroke-dashoffset:0; } }
+@media (prefers-reduced-motion: reduce){ .ekg-wrap path{ animation:none; stroke-dashoffset:0; } }
+
+.demo-grid{display:flex; gap:22px; padding:14px 0 40px; align-items:stretch;}
+.demo-grid > .panel{ flex:1 1 0; min-width:0; }
+@media (max-width: 880px){ .demo-grid{flex-direction:column;} }
+.panel{border-radius:16px; display:flex; flex-direction:column;}
+
+.panel-input{background:linear-gradient(165deg, #E9F6EE 0%, #DCEFE4 100%); border:1px solid #C9E4D3; padding:26px 26px 24px; color:var(--on-dark);}
+.panel-eyebrow{font-size:12.5px; color:var(--on-dark-soft); font-weight:500; letter-spacing:0.2px;}
+.rec-status-row{display:flex; align-items:center; gap:10px; margin-top:16px; margin-bottom:8px;}
+.rec-dot{width:9px; height:9px; border-radius:50%; background:var(--on-dark-soft); flex-shrink:0;}
+.rec-dot.live{background:var(--pulse); box-shadow:0 0 0 4px rgba(215,38,61,0.28);}
+.rec-status-text{font-size:14.5px; font-weight:600;}
+
+.mic-row{display:flex; align-items:center; gap:16px; margin:18px 0 14px;}
+#micBtn{width:60px; height:60px; border-radius:50%; flex-shrink:0; border:1.5px solid var(--line-dark); background:var(--ink-3); display:flex; align-items:center; justify-content:center; cursor:pointer; transition:border-color .15s ease, background .15s ease;}
+#micBtn:hover{border-color:var(--pulse-soft-on-dark);}
+#micBtn.recording{border-color:var(--pulse); background:#FBD5E3;}
+#micBtn svg{width:24px; height:24px;}
+#micBtn .mic-path{fill:var(--on-dark);}
+#micBtn.recording .mic-path{fill:var(--pulse-soft-on-dark);}
+
+.waveform{flex:1; height:64px; display:flex; align-items:center; justify-content:space-between;}
+.bar{width:4px; height:30%; background:#A9CEB8; border-radius:2px; transform-origin:center; transition:background .2s ease, height .2s ease;}
+.waveform.listening .bar{background:#E28BAC;}
+
+.transcript-box{display:flex; flex-direction:column; margin-top:10px; min-height:130px; flex:1; border:1px dashed var(--line-dark); border-radius:10px; padding:16px; font-size:15.5px; line-height:1.75; color:var(--on-dark); background:rgba(255,255,255,0.55);}
+.transcript-box .interim{color:var(--on-dark-soft);}
+.transcript-empty{color:var(--on-dark-soft); font-size:14px;}
+
+.input-actions{display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-top:16px;}
+.icon-btn{display:none; align-items:center; justify-content:center; width:38px; height:38px; padding:0; background:#FFFFFF; border-radius:8px; cursor:pointer;}
+.icon-btn.show{display:inline-flex;}
+.icon-btn svg{width:16px; height:16px;}
+.clear-btn{border:1px solid #E6BFD0; color:#8E2F53;}
+.clear-btn:hover{background:#FBD5E3; border-color:var(--pulse);}
+.edit-icon{border:1px solid var(--line-dark); color:#3F6B51;}
+.edit-icon:hover{background:var(--verified-tint); border-color:var(--verified);}
+.transcript-edit{flex:1; min-height:108px; width:100%; font-family:'Inter', sans-serif; font-size:15px; line-height:1.7; color:var(--on-dark); background:#FFFFFF; border:1px solid var(--line-dark); border-radius:8px; padding:10px 12px; resize:vertical;}
+.transcript-actions{display:flex; gap:8px; margin-top:10px;}
+.tbtn{font-family:'Inter', sans-serif; font-size:12.5px; font-weight:500; padding:8px 16px; border-radius:8px; cursor:pointer;}
+.tbtn-save{background:var(--verified); border:1px solid var(--verified); color:#FFFFFF;}
+.tbtn-save:hover{background:#2E6B47; border-color:#2E6B47;}
+.tbtn-cancel{background:#FFFFFF; border:1px solid #C9E4D3; color:#5E7D6B;}
+.tbtn-cancel:hover{background:var(--verified-tint);}
+.sample-btn{align-self:flex-start; background:none; border:1px solid var(--line-dark); color:#3F6B51; font-family:'Inter', sans-serif; font-size:12.5px; padding:9px 14px; border-radius:8px; cursor:pointer;}
+.sample-btn:hover{border-color:var(--verified); color:#2E6B47;}
+
+.panel-output{background:var(--paper); border:1px solid var(--line); padding:0; overflow:hidden;}
+.encounter-head{display:flex; align-items:center; justify-content:space-between; padding:18px 24px; border-bottom:1px solid var(--line); background:var(--surface);}
+.encounter-left{display:flex; align-items:center; gap:10px;}
+.encounter-dot{width:9px; height:9px; border-radius:50%; background:var(--verified);}
+.encounter-title{font-size:14.5px; font-weight:600; color:var(--ink);}
+.encounter-right{display:flex; align-items:center; gap:10px;}
+.live-pill{font-size:11.5px; font-weight:600; color:#8E2F53; background:var(--pulse-tint); padding:3px 9px; border-radius:99px; display:none; align-items:center; gap:5px;}
+.live-pill.show{display:inline-flex;}
+.live-pill .dot{width:6px; height:6px; border-radius:50%; background:var(--pulse);}
+.clock{font-size:12.5px; color:var(--text-soft);}
+
+.soap-list{padding:8px 24px 4px;}
+.soap-row{padding:16px 0; border-bottom:1px solid var(--line); display:grid; grid-template-columns:130px 1fr; gap:14px;}
+.soap-row:last-child{border-bottom:none;}
+.soap-field-label{font-size:13px; font-weight:600; color:var(--text-soft); padding-top:1px;}
+.soap-field-value{font-size:15px; line-height:1.7; color:#C9B3BD; min-height:22px;}
+.soap-row.filled .soap-field-value{color:var(--ink);}
+.soap-row.filled .soap-field-label{color:var(--ink);}
+
+.tag{display:inline-block; background:var(--verified-tint); color:var(--verified); border-radius:6px; padding:2px 9px; margin:2px 6px 2px 0; font-size:13.5px; font-weight:500; animation:fillIn .35s ease;}
+@keyframes fillIn{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
+
+.disclaimer{padding:14px 24px 20px; font-size:12px; color:var(--text-soft); font-style:italic; border-top:1px dashed var(--line); margin-top:6px;}
+
+footer{padding:20px 0 40px; border-top:1px solid var(--line); display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; font-size:12.5px; color:var(--text-soft);}
+.confirm-bar{display:none; flex-wrap:wrap; align-items:center; gap:12px; padding:16px 24px; background:var(--pulse-tint); border-top:1px solid var(--line);}
+.confirm-bar.show{display:flex;}
+.confirm-bar .q{flex:1 1 220px; font-size:14.5px; font-weight:600; color:#8E2F53;}
+.confirm-bar .hint{flex:1 1 220px; font-size:13px; color:var(--text-soft);}
+.confirm-actions{display:flex; gap:8px;}
+.cbtn{font-family:'Inter', sans-serif; font-size:13px; font-weight:500; padding:8px 18px; border-radius:8px; cursor:pointer;}
+.cbtn-yes{background:var(--verified); border:1px solid var(--verified); color:#FFFFFF;}
+.cbtn-yes:hover{background:#2E6B47; border-color:#2E6B47;}
+.cbtn-no{background:#FFFFFF; border:1px solid var(--pulse); color:#8E2F53;}
+.cbtn-no:hover{background:#FBD5E3;}
+.cbtn-plain{background:#FFFFFF; border:1px solid #E6BFD0; color:var(--text-soft);}
+.cbtn-plain:hover{background:#FBD5E3;}
+.done-bar{display:none; flex-wrap:wrap; align-items:center; gap:12px; padding:16px 24px; background:var(--verified-tint); border-top:1px solid #C9E4D3;}
+.done-bar.show{display:flex;}
+.done-bar .q{flex:1 1 220px; font-size:14px; font-weight:600; color:#2E6B47;}
+.cbtn-again{background:#FFFFFF; border:1px solid var(--verified); color:#2E6B47;}
+.cbtn-again:hover{background:#CBE8D6;}
+.confirmed-pill{font-size:11.5px; font-weight:600; color:#2E6B47; background:var(--verified-tint); padding:3px 9px; border-radius:99px; display:none;}
+.confirmed-pill.show{display:inline-block;}
+.edit-area{width:100%; font-family:'Inter', sans-serif; font-size:14px; line-height:1.6; color:var(--ink); background:var(--surface); border:1px solid #E6BFD0; border-radius:8px; padding:8px 10px; resize:vertical;}
+.notice{background:var(--pulse-tint); border:1px solid var(--pulse); color:#8E2F53; padding:14px 18px; border-radius:10px; font-size:14px; margin:18px 0 0; display:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="16" cy="16" r="15" fill="none" stroke="#3F8F63" stroke-width="1.5"/>
+        <path d="M4 16 H11 L13.5 9 L17.5 23 L20 16 H28" fill="none" stroke="#D6547F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="brand-name">Voice to EHR</span>
+    </div>
+    <div class="topbar-right">
+      <span class="demo-tag">Lana Fahad &middot; Nebras Almutairy &middot; Alhanouf Aldubyan &middot; Shumua Alharbi</span>
+      <span class="demo-tag">Live technical demo</span>
+      <select id="langSelect">
+        <option value="en-US">English</option>
+        <option value="ar-SA">Arabic</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="hero">
+    <h1>Say it out loud, chart it right</h1>
+    <p>Just speak, our system turns it into a structured patient note in real time</p>
+  </div>
+
+  <div class="ekg-wrap">
+    <svg viewBox="0 0 1180 52" preserveAspectRatio="none" width="100%" height="52">
+      <path d="M0,30 L430,30 L458,12 L480,44 L505,4 L528,30 L1180,30"/>
+    </svg>
+  </div>
+
+  <div id="notice" class="notice"></div>
+
+  <div class="demo-grid">
+    <div class="panel panel-input">
+      <div class="panel-eyebrow">Voice input</div>
+      <div class="rec-status-row">
+        <span class="rec-dot" id="recDot"></span>
+        <span class="rec-status-text" id="statusText">Tap to start</span>
+      </div>
+
+      <div class="mic-row">
+        <button id="micBtn" aria-label="Start recording">
+          <svg viewBox="0 0 24 24"><path class="mic-path" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.93V21h2v-2.07A7 7 0 0 0 19 12h-2Z"/></svg>
+        </button>
+        <div class="waveform" id="waveform"></div>
+      </div>
+
+      <div class="transcript-box" id="transcriptBox">
+        <span class="transcript-empty">Spoken text will appear here as you talk...</span>
+      </div>
+
+      <div class="input-actions">
+        <button class="sample-btn" id="sampleBtn">Play a sample line instead</button>
+        <button class="icon-btn edit-icon" id="editTextBtn" aria-label="Edit the spoken text" title="Edit the spoken text">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </button>
+        <button class="icon-btn clear-btn" id="clearBtn" aria-label="Delete the spoken text and start over" title="Delete and re-record">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="panel panel-output">
+      <div class="encounter-head">
+        <div class="encounter-left">
+          <span class="encounter-dot"></span>
+          <span class="encounter-title">New encounter</span>
+        </div>
+        <div class="encounter-right">
+          <span class="live-pill" id="livePill"><span class="dot"></span>Live</span>
+          <span class="confirmed-pill" id="confirmedPill">Confirmed</span>
+          <span class="clock" id="clock"></span>
+        </div>
+      </div>
+
+      <div class="soap-list">
+        <div class="soap-row" id="field-s">
+          <div class="soap-field-label">Subjective</div>
+          <div class="soap-field-value" id="value-s">Waiting for speech...</div>
+        </div>
+        <div class="soap-row" id="field-o">
+          <div class="soap-field-label">Objective</div>
+          <div class="soap-field-value" id="value-o">Waiting for speech...</div>
+        </div>
+        <div class="soap-row" id="field-a">
+          <div class="soap-field-label">Assessment</div>
+          <div class="soap-field-value" id="value-a">Waiting for speech...</div>
+        </div>
+        <div class="soap-row" id="field-p">
+          <div class="soap-field-label">Plan</div>
+          <div class="soap-field-value" id="value-p">Waiting for speech...</div>
+        </div>
+      </div>
+
+      <div class="confirm-bar" id="confirmBar">
+        <span class="q">Is the information entered correct?</span>
+        <div class="confirm-actions">
+          <button class="cbtn cbtn-yes" id="yesBtn">Yes</button>
+          <button class="cbtn cbtn-no" id="noBtn">No, edit it</button>
+        </div>
+      </div>
+
+      <div class="confirm-bar" id="editBar">
+        <span class="hint">Edit any field above, one entry per line.</span>
+        <div class="confirm-actions">
+          <button class="cbtn cbtn-yes" id="saveBtn">Save changes</button>
+          <button class="cbtn cbtn-plain" id="cancelBtn">Cancel</button>
+        </div>
+      </div>
+
+      <div class="done-bar" id="doneBar">
+        <span class="q">Confirmed. Ready to save to the chart.</span>
+        <button class="cbtn cbtn-again" id="againBtn">Edit again</button>
+      </div>
+
+      <div class="disclaimer">Auto-generated from voice. Review before saving to the chart.</div>
+    </div>
+  </div>
+
+  <footer>
+    <span>Transcription runs through your browser's built-in speech service; the SOAP note itself is built and kept locally, and nothing is saved</span>
+    <span>Built by Lana Fahad, Nebras Almutairy, Alhanouf Aldubyan, Shumua Alharbi</span>
+  </footer>
+
+</div>
+
+<script>
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+const micBtn = document.getElementById('micBtn');
+const statusText = document.getElementById('statusText');
+const recDot = document.getElementById('recDot');
+const transcriptBox = document.getElementById('transcriptBox');
+const langSelect = document.getElementById('langSelect');
+const sampleBtn = document.getElementById('sampleBtn');
+const waveform = document.getElementById('waveform');
+const livePill = document.getElementById('livePill');
+const clockEl = document.getElementById('clock');
+const notice = document.getElementById('notice');
+
+function showNotice(msg){ notice.textContent = msg; notice.style.display = 'block'; }
+function hideNotice(){ notice.style.display = 'none'; }
+
+const BAR_COUNT = 28;
+for (let i = 0; i < BAR_COUNT; i++){
+  const bar = document.createElement('div');
+  bar.className = 'bar';
+  waveform.appendChild(bar);
+}
+const bars = waveform.querySelectorAll('.bar');
+let eqInterval = null;
+
+function startEq(){
+  if (eqInterval) return;
+  eqInterval = setInterval(() => {
+    bars.forEach(b => { b.style.height = (14 + Math.random() * 86) + '%'; });
+  }, 120);
+  waveform.classList.add('listening');
+}
+function stopEq(){
+  if (eqInterval) clearInterval(eqInterval);
+  eqInterval = null;
+  waveform.classList.remove('listening');
+  bars.forEach(b => { b.style.height = '30%'; });
+}
+
+function tickClock(){
+  clockEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+tickClock();
+setInterval(tickClock, 15000);
+
+let recognition = null;
+let listening = false;
+let finalTranscript = '';
+
+function initRecognition(){
+  if (!SR) return null;
+  const r = new SR();
+  r.continuous = true;
+  r.interimResults = true;
+  r.lang = langSelect.value;
+
+  r.onresult = (event) => {
+    let interim = '';
+    for (let i = event.resultIndex; i < event.results.length; i++){
+      const chunk = event.results[i][0].transcript;
+      if (event.results[i].isFinal){
+        finalTranscript += chunk + ' ';
+        scanTranscript(finalTranscript);
+      } else {
+        interim += chunk;
+      }
+    }
+    updateTranscriptDisplay(interim);
+  };
+
+  r.onerror = (e) => {
+    const err = e && e.error;
+    if (err === 'not-allowed' || err === 'service-not-allowed'){
+      showNotice('Microphone access was blocked. Click the padlock in the address bar, allow the microphone for this page, then tap the mic again.');
+    } else if (err === 'no-speech'){
+      showNotice('No speech was detected. Tap the mic and speak a little closer.');
+    } else if (err === 'audio-capture'){
+      showNotice('No microphone was found. Check your input device and try again.');
+    } else if (err === 'network'){
+      showNotice("The browser's speech service could not be reached. It needs an internet connection, and on a local file Chrome may block it — serve the page over http/https, or use the sample line.");
+    } else if (err && err !== 'aborted'){
+      showNotice('Speech recognition stopped: ' + err + '.');
+    }
+    stopListening();
+  };
+
+  r.onend = () => { if (listening){ try { r.start(); } catch(e) {} } };
+  return r;
+}
+
+function setListeningUI(on){
+  if (on){
+    micBtn.classList.add('recording');
+    recDot.classList.add('live');
+    statusText.textContent = 'Listening';
+    livePill.classList.add('show');
+    startEq();
+  } else {
+    micBtn.classList.remove('recording');
+    recDot.classList.remove('live');
+    livePill.classList.remove('show');
+    stopEq();
+  }
+}
+
+function startListening(){
+  if (!SR) return;
+  hideNotice();
+  editing = false; confirmed = false; overrides = null;
+  hideBars();
+  recognition = initRecognition();
+  recognition.lang = langSelect.value;
+  try { recognition.start(); } catch(e) {}
+  listening = true;
+  setListeningUI(true);
+}
+
+function stopListening(){
+  listening = false;
+  if (recognition){ try { recognition.stop(); } catch(e) {} }
+  setListeningUI(false);
+  statusText.textContent = 'Paused';
+  updateTranscriptDisplay('');
+  showReview();
+  updateClearBtn();
+}
+
+function updateTranscriptDisplay(interim){
+  if (transcriptEditing) return;
+  if (!finalTranscript && !interim){
+    transcriptBox.innerHTML = '<span class="transcript-empty">Spoken text will appear here as you talk...</span>';
+    return;
+  }
+  transcriptBox.innerHTML = finalTranscript + (interim ? '<span class="interim">' + interim + '</span>' : '');
+}
+
+micBtn.addEventListener('click', () => {
+  if (!SR){
+    showNotice("This browser doesn't support speech recognition. Try Google Chrome on desktop or mobile.");
+    return;
+  }
+  if (listening) stopListening();
+  else startListening();
+});
+
+langSelect.addEventListener('change', () => {
+  if (recognition) recognition.lang = langSelect.value;
+});
+
+if (!SR){
+  showNotice("This browser doesn't support speech recognition. Try Google Chrome on desktop or mobile.");
+  micBtn.style.opacity = '0.5';
+  micBtn.style.cursor = 'not-allowed';
+}
+
+const SYMPTOMS = [
+  {kw:['headache','صداع','راسي يوجعني','راسي وجعني'], label:'Headache'},
+  {kw:['fever','حرارة','سخونة','ارتفاع الحرارة'], label:'Fever'},
+  {kw:['cough','سعال','كحة'], label:'Cough'},
+  {kw:['abdominal pain','stomach pain','ألم في البطن','مغص','وجع بطن'], label:'Abdominal pain'},
+  {kw:['chest pain','ألم في الصدر','وجع صدر'], label:'Chest pain'},
+  {kw:['dizziness','dizzy','دوخة','دوار'], label:'Dizziness'},
+  {kw:['nausea','غثيان','ترجيع','قيء'], label:'Nausea'},
+  {kw:['fatigue','tired','إرهاق','تعب عام','إعياء'], label:'Fatigue'},
+  {kw:['shortness of breath','difficulty breathing','ضيق تنفس','صعوبة تنفس'], label:'Shortness of breath'},
+  {kw:['sore throat','التهاب حلق','وجع حلق'], label:'Sore throat'},
+  {kw:['joint pain','muscle pain','ألم في المفاصل','ألم عضلي','ألم في العضلات'], label:'Joint or muscle pain'},
+  {kw:['back pain','ألم الظهر','وجع الظهر'], label:'Back pain'},
+  {kw:['rash','skin rash','طفح جلدي'], label:'Skin rash'},
+  {kw:['diarrhea','إسهال'], label:'Diarrhea'},
+  {kw:['loss of appetite','no appetite','فقدان الشهية'], label:'Loss of appetite'},
+  {kw:['palpitations','heart racing','خفقان','دقات قلب سريعة'], label:'Palpitations'},
+  {kw:['ear pain','earache','ألم الأذن','وجع الأذن'], label:'Ear pain'},
+  {kw:['sneezing','sneeze','عطاس','عطس'], label:'Sneezing'},
+  {kw:['runny nose','nasal discharge','rhinorrhea','سيلان الأنف','رشح'], label:'Runny nose'},
+  {kw:['nasal congestion','blocked nose','stuffy nose','احتقان الأنف','انسداد الأنف'], label:'Nasal congestion'},
+  {kw:['itchy eyes','watery eyes','itchy nose','حكة العين','دموع'], label:'Itchy or watery eyes'},
+  {kw:['knee pain','knee swelling','swollen knee','ألم الركبة','تورم الركبة'], label:'Knee pain and swelling'},
+  {kw:['swelling','swollen','تورم'], label:'Swelling'}
+];
+
+const HISTORY_MARKERS = [
+  {kw:['type 1 diabetes','type one diabetes','t1dm','السكري النوع الأول'], label:'Type 1 Diabetes', clears:['Type 2 Diabetes']},
+  {kw:['type 2 diabetes','type two diabetes','t2dm','diabetic','diabetes','السكري','مرض السكر'], label:'Type 2 Diabetes'},
+  {kw:['history of gout','known gout','gout','النقرس'], label:'History of gout'},
+  {kw:['asthma','الربو'], label:'Asthma'},
+  {kw:['known hypertension','history of hypertension','hypertensive','ارتفاع ضغط الدم المزمن'], label:'Hypertension'},
+  {kw:['heart failure','ischemic heart disease','قصور القلب','مرض القلب'], label:'Cardiac history'},
+  {kw:['kidney disease','renal failure','مرض الكلى','قصور كلوي'], label:'Renal history'},
+  {kw:['seasonal allergy','allergic rhinitis','hay fever','allergies','حساسية موسمية','حساسية'], label:'Known allergies'},
+  {kw:['no chronic disease','no chronic illness','no chronic conditions','no medical history','not known to have any chronic','لا يوجد أمراض مزمنة','بدون أمراض مزمنة'], label:'No chronic disease'}
+];
+
+const DURATION_RE = /(?:for|since|من|منذ)\s+(?:the\s+)?(?:past\s+|last\s+)?(a|an|one|two|three|four|five|six|seven|\d{1,2})?\s*(day|days|week|weeks|month|months|hour|hours|year|years|yesterday|أيام|يوم|أسبوع|أسابيع|شهر|أشهر|أمس)/i;
+
+const OBJECTIVE_MARKERS = [
+  {kw:['high blood pressure','elevated blood pressure','hypertension','ضغط مرتفع','ضغط عالي'], label:'Elevated blood pressure'},
+  {kw:['low blood pressure','hypotension','انخفاض ضغط','ضغط منخفض'], label:'Low blood pressure'},
+  {kw:['rapid pulse','fast heartbeat','tachycardia','نبض سريع','تسارع نبض'], label:'Rapid pulse'},
+  {kw:['slow pulse','bradycardia','نبض بطيء'], label:'Slow pulse'},
+  {kw:['irregular heartbeat','irregular pulse','عدم انتظام النبض','نبض غير منتظم'], label:'Irregular heartbeat'},
+  {kw:['rapid breathing','fast breathing','tachypnea','تسارع التنفس'], label:'Rapid breathing'},
+  {kw:['pale','pallor','شاحب','شحوب'], label:'Noticeable pallor'},
+  {kw:['sweating','sweaty','diaphoretic','متعرق','تعرق'], label:'Noticeable sweating'},
+  {kw:['blood test','blood work','bloodwork','lab test','labs','laboratory','تحليل دم','فحص دم','تحاليل','مختبر'], label:'Blood test ordered or reviewed'},
+  {kw:['complete blood count','cbc','صورة دم كاملة'], label:'Complete blood count (CBC)'},
+  {kw:['high blood sugar','elevated blood sugar','hyperglycemia','high glucose','سكر مرتفع','سكر عالي'], label:'Elevated blood sugar'},
+  {kw:['low blood sugar','hypoglycemia','low glucose','سكر منخفض','هبوط سكر'], label:'Low blood sugar'},
+  {kw:['blood sugar','glucose','سكر الدم','مستوى السكر'], label:'Blood sugar checked'},
+  {kw:['hba1c','a1c','السكر التراكمي'], label:'HbA1c'},
+  {kw:['low iron','iron deficiency','anemia','anaemia','نقص حديد','فقر دم','أنيميا'], label:'Low iron / anemia'},
+  {kw:['iron level','ferritin','hemoglobin','haemoglobin','مستوى الحديد','فيريتين','الهيموغلوبين','خضاب الدم'], label:'Iron / hemoglobin level'},
+  {kw:['high uric acid','elevated uric acid','حمض يوريك مرتفع','النقرس'], label:'Elevated uric acid'},
+  {kw:['uric acid','حمض اليوريك','حمض البوليك'], label:'Uric acid level'},
+  {kw:['high infection level','raised inflammatory markers','elevated crp','high crp','high white blood cells','leukocytosis','ارتفاع مؤشرات الالتهاب','كريات بيضاء مرتفعة'], label:'Elevated infection markers'},
+  {kw:['infection level','inflammatory markers','crp','c-reactive protein','esr','white blood cells','wbc','مستوى الالتهاب','مؤشرات الالتهاب','كريات الدم البيضاء'], label:'Infection / inflammation markers'},
+  {kw:['low oxygen','desaturation','hypoxia','oxygen is low','أكسجين منخفض','نقص أكسجين'], label:'Low oxygen saturation'},
+  {kw:['oxygen saturation','oxygen level','spo2','sats','pulse oximetry','تشبع الأكسجين','مستوى الأكسجين'], label:'Oxygen saturation checked'},
+  {kw:['kidney function','creatinine','urea','egfr','وظائف الكلى','الكرياتينين'], label:'Kidney function test'},
+  {kw:['liver function','alt','ast','bilirubin','وظائف الكبد'], label:'Liver function test'},
+  {kw:['thyroid','tsh','الغدة الدرقية'], label:'Thyroid function test'},
+  {kw:['cholesterol','lipid panel','triglycerides','ldl','hdl','الكوليسترول','الدهون الثلاثية'], label:'Cholesterol / lipid panel'},
+  {kw:['vitamin d','فيتامين د'], label:'Vitamin D level'},
+  {kw:['vitamin b12','b12','فيتامين ب١٢','فيتامين ب 12'], label:'Vitamin B12 level'},
+  {kw:['urine test','urinalysis','تحليل بول'], label:'Urine test'},
+  {kw:['x-ray','xray','أشعة','أشعة سينية'], label:'X-ray'},
+  {kw:['ct scan','ultrasound','mri','سونار','رنين','مقطعية'], label:'Imaging ordered'},
+  {kw:['ecg','ekg','electrocardiogram','تخطيط قلب','رسم قلب'], label:'ECG'},
+  {kw:['weight','وزن'], label:'Weight recorded'},
+  {kw:['height','الطول'], label:'Height recorded'},
+  {kw:['bmi','مؤشر كتلة الجسم'], label:'BMI recorded'},
+  {kw:['normal temperature','temperature is normal','afebrile','no fever','حرارة طبيعية'], label:'Normal temperature'},
+  {kw:['normal pulse','pulse is normal','normal heart rate','نبض طبيعي'], label:'Normal pulse'},
+  {kw:['normal blood pressure','blood pressure is normal','ضغط طبيعي'], label:'Normal blood pressure'},
+  {kw:['vital signs are normal','vitals are normal','vitals normal','العلامات الحيوية طبيعية'], label:'Vital signs within normal limits'},
+  {kw:['fever','حرارة','سخونة','ارتفاع الحرارة'], label:'Febrile on assessment'}
+];
+
+const NUMERIC_MARKERS = [
+  {re:/(?:temperature|temp|fever|حرارة)\D{0,18}(3[3-9](?:[.,]\d)?|4[0-3](?:[.,]\d)?)/i, fmt:v => 'Temperature ' + v.replace(',', '.') + '°C'},
+  {re:/\b(3[5-9](?:[.,]\d)?|4[0-3](?:[.,]\d)?)\s*(?:degrees|degree|°|درجة|درجات)/i, fmt:v => 'Temperature ' + v.replace(',', '.') + '°C'},
+  {re:/(?:blood pressure|bp|ضغط)\D{0,18}(\d{2,3})\s*(?:over|\/|على)\s*(\d{2,3})/i, fmt:(a,b) => 'Blood pressure ' + a + '/' + b + ' mmHg'},
+  {re:/(?:pulse|heart rate|hr|نبض)\D{0,18}(\d{2,3})/i, fmt:v => 'Pulse ' + v + ' bpm'},
+  {re:/(?:oxygen|saturation|spo2|sats|أكسجين)\D{0,18}(\d{2,3})\s*(?:%|percent|بالمئة)?/i, fmt:v => 'Oxygen saturation ' + v + '%'},
+  {re:/(?:blood sugar|glucose|sugar|سكر)\D{0,18}(\d{2,3}(?:[.,]\d)?)/i, fmt:v => 'Blood sugar ' + v.replace(',', '.')},
+  {re:/(?:respiratory rate|breathing rate|rr)\D{0,18}(\d{1,2})/i, fmt:v => 'Respiratory rate ' + v + '/min'},
+  {re:/(?:hemoglobin|haemoglobin|hb|الهيموغلوبين)\D{0,18}(\d{1,2}(?:[.,]\d)?)/i, fmt:v => 'Hemoglobin ' + v.replace(',', '.')},
+  {re:/(?:uric acid|حمض اليوريك)\D{0,18}(\d{1,2}(?:[.,]\d)?)/i, fmt:v => 'Uric acid ' + v.replace(',', '.')},
+  {re:/(?:ferritin|iron|حديد)\D{0,18}(\d{1,4}(?:[.,]\d)?)/i, fmt:v => 'Iron / ferritin ' + v.replace(',', '.')},
+  {re:/(?:crp|c-reactive protein)\D{0,18}(\d{1,3}(?:[.,]\d)?)/i, fmt:v => 'CRP ' + v.replace(',', '.')},
+  {re:/(?:white blood cells|wbc)\D{0,18}(\d{1,3}(?:[.,]\d)?)/i, fmt:v => 'White blood cells ' + v.replace(',', '.')},
+  {re:/(?:weight|وزن)\D{0,18}(\d{2,3}(?:[.,]\d)?)\s*(?:kg|kilo|كيلو)/i, fmt:v => 'Weight ' + v.replace(',', '.') + ' kg'}
+];
+
+const ASSESSMENT_RULES = [
+  {rank:3, needs:['Knee pain and swelling','History of gout','Elevated uric acid'], label:'Acute gout flare affecting the knee.'},
+  {rank:3, needs:['Joint or muscle pain','History of gout','Elevated uric acid'], label:'Acute gout flare.'},
+  {rank:3, needs:['Dizziness','Fatigue','Low iron / anemia'], label:"Iron-deficiency anemia, consistent with the patient's dizziness and fatigue."},
+  {rank:3, needs:['Fatigue','Low iron / anemia'], label:"Iron-deficiency anemia, consistent with the patient's fatigue."},
+  {rank:3, needs:['Sneezing','Itchy or watery eyes'], absent:['Fever','Febrile on assessment'], label:'Seasonal allergic rhinitis.'},
+  {rank:3, needs:['Sneezing','Runny nose'], absent:['Fever','Febrile on assessment'], label:'Seasonal allergic rhinitis.'},
+  {rank:3, needs:['Sneezing','Known allergies'], label:'Seasonal allergic rhinitis.'},
+  {rank:3, needs:['Diarrhea','Abdominal pain'], label:'Acute gastroenteritis.'},
+  {rank:3, needs:['Headache','Cough','Fever'], label:'Acute febrile upper respiratory illness, most likely viral.'},
+  {rank:3, needs:['Cough','Sore throat','Fever'], label:'Acute upper respiratory tract infection.'},
+  {rank:3, needs:['Cough','Sore throat'], label:'Upper respiratory tract infection, most likely viral.'},
+  {rank:3, needs:['Fever','Elevated infection markers'], label:'Active infection, supported by the raised inflammatory markers.'},
+  {rank:3, needs:['Low blood sugar'], label:'Hypoglycemia requiring immediate correction.'},
+  {rank:3, needs:['Elevated blood sugar','Type 2 Diabetes'], label:'Poorly controlled Type 2 Diabetes with hyperglycemia.'},
+  {rank:3, needs:['Elevated blood sugar','Type 1 Diabetes'], label:'Poorly controlled Type 1 Diabetes with hyperglycemia.'},
+
+  {rank:2, needs:['Chest pain','Shortness of breath'], label:'Chest pain with breathlessness, an acute cardiac or pulmonary cause must be excluded urgently.'},
+  {rank:4, needs:['Shortness of breath','Elevated blood sugar','Type 2 Diabetes'], label:'Shortness of breath requiring further evaluation, with elevated blood glucose in a patient with Type 2 Diabetes.'},
+  {rank:2, needs:['Shortness of breath','Low oxygen saturation'], label:'Hypoxic respiratory compromise requiring urgent assessment.'},
+  {rank:2, needs:['Shortness of breath','Asthma'], label:'Likely asthma exacerbation.'},
+  {rank:2, needs:['Palpitations','Dizziness'], label:'Symptoms suggestive of an arrhythmia, rhythm assessment indicated.'},
+  {rank:2, needs:['Headache','Fever'], label:'Febrile illness, most likely viral.'},
+  {rank:2, needs:['Cough','Fever'], label:'Febrile respiratory illness, likely infective.'},
+  {rank:2, needs:['Joint or muscle pain','Fatigue','Fever'], label:'Systemic viral or inflammatory illness.'},
+  {rank:2, needs:['Skin rash','Fever'], label:'Febrile rash, an infectious or drug reaction should be considered.'},
+  {rank:2, needs:['Rapid pulse','Fever'], label:'Tachycardia attributable to the febrile illness.'},
+  {rank:2, needs:['Elevated blood pressure','Hypertension'], label:'Uncontrolled hypertension on current therapy.'},
+  {rank:2, needs:['Elevated uric acid','History of gout'], label:'Hyperuricemia in known gout, flare risk.'},
+
+  {rank:1, needs:['Chest pain'], label:'Chest pain of undetermined cause, cardiac assessment required.'},
+  {rank:1, needs:['Shortness of breath'], label:'Shortness of breath requiring further evaluation.'},
+  {rank:1, needs:['Abdominal pain'], label:'Abdominal pain requiring gastrointestinal evaluation.'},
+  {rank:1, needs:['Low oxygen saturation'], label:'Impaired oxygenation requiring prompt review.'},
+  {rank:1, needs:['Low blood pressure'], label:'Hypotension, volume status and cause to be assessed.'},
+  {rank:1, needs:['Elevated blood pressure'], label:'Elevated blood pressure, to be confirmed on repeat readings.'},
+  {rank:1, needs:['Elevated blood sugar'], label:'Hyperglycemia requiring further evaluation.'},
+  {rank:1, needs:['Low iron / anemia'], label:'Anemia requiring iron studies and further evaluation.'},
+  {rank:1, needs:['Elevated uric acid'], label:'Hyperuricemia, clinical correlation required.'},
+  {rank:1, needs:['Elevated infection markers'], label:'Raised inflammatory markers, source of infection to be identified.'},
+  {rank:1, needs:['Fatigue'], label:'Fatigue of undetermined cause, screening for anemia or metabolic disease advised.'},
+  {rank:1, needs:['Dizziness'], label:'Dizziness requiring further evaluation.'},
+  {rank:1, needs:['Skin rash'], label:'Skin rash of undetermined cause.'},
+  {rank:1, needs:['Knee pain and swelling'], label:'Monoarticular knee swelling requiring joint assessment.'},
+  {rank:1, needs:['Rapid pulse'], label:'Tachycardia of undetermined cause.'},
+  {rank:1, needs:['Fever'], label:'Febrile illness, source not yet identified.'}
+];
+
+const PLAN_RULES = [
+  {needs:['Headache'], label:'Pain reliever, follow up if it persists beyond two days'},
+  {needs:['Fever'], label:'Antipyretic, recheck temperature every 6 hours'},
+  {needs:['Cough','Sore throat'], label:'Voice rest and warm fluids, return if symptoms worsen'},
+  {needs:['Chest pain','Shortness of breath'], label:'Immediate referral for emergency assessment'},
+  {needs:['Abdominal pain'], label:'Monitor symptoms, refer for clinical exam if pain persists'},
+  {needs:['Diarrhea'], label:'Oral rehydration and a bland diet, review if it persists beyond 48 hours'},
+  {needs:['Skin rash'], label:'Antihistamine if itching, monitor for spread, refer if it worsens'},
+  {needs:['Low oxygen saturation'], label:'Supplemental oxygen and urgent review'},
+  {needs:['Elevated blood pressure'], label:'Repeat blood pressure reading, review antihypertensive therapy'},
+  {needs:['Low blood sugar'], label:'Give fast-acting glucose, recheck in 15 minutes'},
+  {needs:['Elevated blood sugar'], label:'Review diabetic medication and diet, recheck fasting glucose'},
+  {needs:['Low iron / anemia'], label:'Iron studies and supplementation as indicated'},
+  {needs:['Elevated uric acid'], label:'Reduce purine intake, treat acute attacks as needed'},
+  {needs:['Elevated infection markers'], label:'Identify the source of infection, consider antibiotics'},
+  {needs:['Palpitations','Dizziness'], label:'ECG recommended, avoid caffeine until reviewed'},
+  {needs:['Joint or muscle pain'], label:'Rest and anti-inflammatory as needed, follow up if it limits movement'},
+  {needs:['Swelling'], label:'Elevate the area, monitor size, refer if it spreads quickly'},
+  {needs:['Back pain'], label:'Gentle movement and heat, refer for imaging if pain radiates or persists'}
+];
+
+let sState = new Set();
+let oState = new Set();
+let hxState = new Set();
+let msrState = new Set();
+let durationText = '';
+
+function scanTranscript(rawText){
+  const text = rawText.toLowerCase();
+  SYMPTOMS.forEach(s => { if (s.kw.some(k => text.includes(k.toLowerCase()))) sState.add(s.label); });
+  OBJECTIVE_MARKERS.forEach(o => { if (o.kw.some(k => text.includes(k.toLowerCase()))) oState.add(o.label); });
+  NUMERIC_MARKERS.forEach(n => { const m = text.match(n.re); if (m) msrState.add(n.fmt(m[1], m[2])); });
+  HISTORY_MARKERS.forEach(hm => {
+    if (hm.kw.some(k => text.includes(k.toLowerCase()))){
+      hxState.add(hm.label);
+      (hm.clears || []).forEach(c => hxState.delete(c));
+    }
+  });
+  if (hxState.size > 1) hxState.delete('No chronic disease');
+  const dur = text.match(DURATION_RE);
+  durationText = dur ? 'Duration: ' + dur[0].replace(/^(for|since|من|منذ)\s+/i, '').trim() : '';
+  renderSOAP();
+  updateClearBtn();
+}
+
+const IGNORE_IN_ASSESSMENT = /^(Duration|Normal|Vital|No chronic disease|Known allergies|Type 1 Diabetes|Type 2 Diabetes|Hypertension|Asthma|History of gout|Cardiac history|Renal history|Weight|Height|BMI|Blood test|Complete blood|Blood sugar checked|Oxygen saturation checked|Iron \/ hemoglobin|Infection \/ inflammation|Uric acid level|Kidney|Liver|Thyroid|Cholesterol|Vitamin|Urine|X-ray|Imaging|ECG|HbA1c|Febrile on assessment)/;
+
+function assess(findingList){
+  const has = new Set(findingList);
+  const matched = ASSESSMENT_RULES
+    .filter(r => r.needs.every(n => has.has(n)) && !(r.absent || []).some(n => has.has(n)))
+    .sort((a, b) => b.rank - a.rank || b.needs.length - a.needs.length);
+  const claimed = new Set();
+  const out = [];
+  matched.forEach(r => {
+    if (r.needs.some(n => claimed.has(n))) return;
+    r.needs.forEach(n => claimed.add(n));
+    if (out.indexOf(r.label) === -1) out.push(r.label);
+  });
+  const symptomLabels = new Set(SYMPTOMS.map(x => x.label));
+  const unexplained = findingList.filter(f => !claimed.has(f) && !IGNORE_IN_ASSESSMENT.test(f) && !symptomLabels.has(f));
+  if (!out.length && findingList.length){
+    return ['The information provided is insufficient to establish a specific diagnosis; further evaluation is required.'];
+  }
+  if (unexplained.length){
+    out.push('Additional findings noted (' + unexplained.join(', ') + ') require further evaluation.');
+  }
+  return out;
+}
+
+function renderSOAP(){
+  if (typeof editing !== 'undefined' && editing) return;
+  if (typeof overrides !== 'undefined' && overrides){
+    KEYS.forEach(k => setFieldText(k, overrides[k]));
+    return;
+  }
+  const subjective = [...sState]
+    .concat([...hxState].map(x => 'History: ' + x))
+    .concat(durationText ? [durationText] : []);
+  setFieldText('s', subjective);
+  setFieldText('o', [...oState, ...msrState]);
+
+  const findingList = [...sState, ...oState, ...hxState];
+  const findings = new Set(findingList);
+  setFieldText('a', assess(findingList));
+
+  const plan = PLAN_RULES
+    .filter(r => r.needs.every(n => findings.has(n)))
+    .map(r => r.label);
+  setFieldText('p', [...new Set(plan)]);
+}
+
+function setField(key, setOfLabels){
+  setFieldText(key, [...setOfLabels]);
+}
+
+const confirmBar = document.getElementById('confirmBar');
+const editBar = document.getElementById('editBar');
+const doneBar = document.getElementById('doneBar');
+const confirmedPill = document.getElementById('confirmedPill');
+let editing = false, confirmed = false;
+let overrides = null;
+const KEYS = ['s','o','a','p'];
+
+function currentValues(){
+  const out = {};
+  KEYS.forEach(k => {
+    if (overrides && overrides[k]) { out[k] = overrides[k].slice(); return; }
+    const el = document.getElementById('value-' + k);
+    const tags = el.querySelectorAll('.tag');
+    out[k] = [...tags].map(t => t.textContent);
+  });
+  return out;
+}
+
+function hasContent(){
+  const v = currentValues();
+  return KEYS.some(k => v[k].length > 0);
+}
+
+function showReview(){
+  if (editing || confirmed || !hasContent()) return;
+  confirmBar.classList.add('show');
+  editBar.classList.remove('show');
+  doneBar.classList.remove('show');
+}
+function hideBars(){
+  confirmBar.classList.remove('show');
+  editBar.classList.remove('show');
+  doneBar.classList.remove('show');
+  confirmedPill.classList.remove('show');
+}
+
+function startEditing(){
+  editing = true; confirmed = false;
+  const v = currentValues();
+  KEYS.forEach(k => {
+    const el = document.getElementById('value-' + k);
+    const ta = document.createElement('textarea');
+    ta.className = 'edit-area';
+    ta.rows = 3;
+    ta.value = v[k].join('\n');
+    el.innerHTML = '';
+    el.appendChild(ta);
+    document.getElementById('field-' + k).classList.add('filled');
+  });
+  confirmBar.classList.remove('show');
+  doneBar.classList.remove('show');
+  confirmedPill.classList.remove('show');
+  editBar.classList.add('show');
+}
+
+function saveEdits(){
+  overrides = {};
+  KEYS.forEach(k => {
+    const ta = document.querySelector('#value-' + k + ' textarea');
+    overrides[k] = (ta ? ta.value : '').split('\n').map(x => x.trim()).filter(Boolean);
+  });
+  editing = false;
+  KEYS.forEach(k => setFieldText(k, overrides[k]));
+  editBar.classList.remove('show');
+  showReview();
+}
+
+function cancelEdits(){
+  editing = false;
+  const v = overrides || null;
+  if (v) KEYS.forEach(k => setFieldText(k, v[k]));
+  else renderSOAP();
+  editBar.classList.remove('show');
+  showReview();
+}
+
+const clearBtn = document.getElementById('clearBtn');
+
+function updateClearBtn(){
+  const hasAny = !!finalTranscript || sState.size > 0 || oState.size > 0 || msrState.size > 0 || hxState.size > 0 || !!overrides;
+  clearBtn.classList.toggle('show', hasAny && !transcriptEditing);
+  if (typeof updateEditBtn === 'function') updateEditBtn();
+}
+
+function clearAll(){
+  transcriptEditing = false;
+  if (typeof sampleInterval !== 'undefined' && sampleInterval) clearInterval(sampleInterval);
+  if (listening) stopListening();
+  finalTranscript = '';
+  sState = new Set();
+  oState = new Set();
+  hxState = new Set();
+  msrState = new Set();
+  durationText = '';
+  overrides = null;
+  editing = false;
+  confirmed = false;
+  hideBars();
+  hideNotice();
+  renderSOAP();
+  updateTranscriptDisplay('');
+  statusText.textContent = 'Tap to start';
+  updateClearBtn();
+}
+
+clearBtn.addEventListener('click', clearAll);
+
+const editTextBtn = document.getElementById('editTextBtn');
+let transcriptEditing = false;
+
+function updateEditBtn(){
+  editTextBtn.classList.toggle('show', !!finalTranscript && !listening && !transcriptEditing);
+}
+
+function startTranscriptEdit(){
+  transcriptEditing = true;
+  clearBtn.classList.remove('show');
+  editTextBtn.classList.remove('show');
+  transcriptBox.innerHTML = '';
+  const ta = document.createElement('textarea');
+  ta.className = 'transcript-edit';
+  ta.value = finalTranscript.trim();
+  ta.setAttribute('aria-label', 'Edit the spoken text');
+  const actions = document.createElement('div');
+  actions.className = 'transcript-actions';
+  const save = document.createElement('button');
+  save.className = 'tbtn tbtn-save';
+  save.textContent = 'Save text';
+  const cancel = document.createElement('button');
+  cancel.className = 'tbtn tbtn-cancel';
+  cancel.textContent = 'Cancel';
+  actions.appendChild(save);
+  actions.appendChild(cancel);
+  transcriptBox.appendChild(ta);
+  transcriptBox.appendChild(actions);
+  ta.focus();
+
+  save.addEventListener('click', () => {
+    const text = ta.value.trim();
+    transcriptEditing = false;
+    finalTranscript = text ? text + ' ' : '';
+    sState = new Set();
+    oState = new Set();
+    hxState = new Set();
+    msrState = new Set();
+    durationText = '';
+    overrides = null;
+    editing = false;
+    confirmed = false;
+    hideBars();
+    updateTranscriptDisplay('');
+    if (finalTranscript) scanTranscript(finalTranscript); else renderSOAP();
+    updateClearBtn();
+    updateEditBtn();
+    showReview();
+  });
+
+  cancel.addEventListener('click', () => {
+    transcriptEditing = false;
+    updateTranscriptDisplay('');
+    updateClearBtn();
+    updateEditBtn();
+  });
+}
+
+editTextBtn.addEventListener('click', startTranscriptEdit);
+
+document.getElementById('yesBtn').addEventListener('click', () => {
+  confirmed = true; editing = false;
+  confirmBar.classList.remove('show');
+  editBar.classList.remove('show');
+  doneBar.classList.add('show');
+  confirmedPill.classList.add('show');
+});
+document.getElementById('noBtn').addEventListener('click', startEditing);
+document.getElementById('againBtn').addEventListener('click', startEditing);
+document.getElementById('saveBtn').addEventListener('click', saveEdits);
+document.getElementById('cancelBtn').addEventListener('click', cancelEdits);
+
+function setFieldText(key, arr){
+  const el = document.getElementById('value-' + key);
+  const rowEl = document.getElementById('field-' + key);
+  if (arr.length === 0){
+    el.textContent = 'Waiting for speech...';
+    rowEl.classList.remove('filled');
+    return;
+  }
+  el.innerHTML = arr.map(l => '<span class="tag">' + l + '</span>').join('');
+  rowEl.classList.add('filled');
+}
+
+let sampleInterval = null;
+const SAMPLE_EN = "The patient is complaining of headache and fever since yesterday with mild cough and temperature reached 38 degrees";
+
+sampleBtn.addEventListener('click', () => {
+  finalTranscript = '';
+  sState = new Set();
+  oState = new Set();
+  hxState = new Set();
+  msrState = new Set();
+  durationText = '';
+  editing = false; confirmed = false; overrides = null;
+  transcriptEditing = false;
+  hideBars();
+  renderSOAP();
+  updateTranscriptDisplay('');
+  setListeningUI(true);
+  statusText.textContent = 'Listening';
+
+  const words = SAMPLE_EN.split(' ');
+  let i = 0;
+  sampleInterval = setInterval(() => {
+    if (i >= words.length){
+      clearInterval(sampleInterval);
+      setListeningUI(false);
+      statusText.textContent = 'Tap to start';
+      showReview();
+      return;
+    }
+    finalTranscript += words[i] + ' ';
+    updateTranscriptDisplay('');
+    scanTranscript(finalTranscript);
+    i++;
+  }, 220);
+});
+</script>
+</body>
+</html>
